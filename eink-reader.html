@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>電子墨水閱讀器預覽</title>
+<style>
+:root{--bg:#eceff2;--card:#fff;--tx:#1b1f24;--mu:#5d6773;--bd:#d3d8de;--ac:#2f6fed;--paper:#f4f1ea;--ink:#111;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151a;--card:#1b2027;--tx:#e8ebef;--mu:#9aa5b1;--bd:#2d3540;--ac:#6b9bff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12151a;--card:#1b2027;--tx:#e8ebef;--mu:#9aa5b1;--bd:#2d3540;--ac:#6b9bff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif}
+header{padding:14px 16px 0;max-width:1000px;margin:0 auto}
+h1{font-size:1.25rem;margin:0}
+header p{margin:2px 0 0;color:var(--mu);font-size:13px}
+.app{max-width:1000px;margin:0 auto;padding:14px 16px 30px;display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:760px){.app{grid-template-columns:minmax(300px,380px) 1fr;align-items:start}}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;display:grid;gap:10px}
+label{display:grid;gap:2px;font-size:13px;color:var(--mu)}
+label b{color:var(--tx);font-weight:600;display:flex;justify-content:space-between}
+input[type=range],select{width:100%}
+select,button,.fbtn{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+button,.fbtn{cursor:pointer;text-align:center}
+.fbtn input{display:none}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+.stage{display:grid;gap:10px;justify-items:center}
+.dev{width:min(100%,360px);aspect-ratio:3/5;background:#2a2d31;border-radius:18px;padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.page{position:relative;width:100%;height:100%;background:var(--paper);color:var(--ink);border-radius:4px;overflow:hidden;user-select:none;-webkit-user-select:none}
+.page.dk{background:#161616;color:#e6e6e6}
+.page.hc{background:#fff;color:#000}
+.view{position:absolute;overflow:hidden;touch-action:pan-y}
+.flow{height:100%;column-fill:auto;text-align:justify;overflow-wrap:anywhere}
+.flow h2{font-size:1.2em;margin:0 0 .8em}
+.flow p{margin:0 0 .6em;text-indent:2em}
+.foot{position:absolute;left:0;right:0;bottom:0;height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font:11px system-ui;opacity:.7}
+.prog{position:absolute;left:0;bottom:0;height:3px;background:currentColor;opacity:.6}
+.nav{display:flex;gap:8px;width:min(100%,360px)}.nav button{flex:1}
+small{color:var(--mu)}
+</style>
+</head>
+<body>
+<header>
+  <h1>電子墨水閱讀器預覽</h1>
+  <p>參考開源電子書韌體 CrossPoint Reader 的閱讀情境：分頁、字體與版面調整、檔案載入。資料只在你的瀏覽器中處理。</p>
+</header>
+<div class="app">
+  <section class="panel">
+    <div class="row">
+      <label class="fbtn">開啟 EPUB／TXT<input type="file" id="file" accept=".epub,.txt,.md"></label>
+      <button id="demo">載入示範文章</button>
+    </div>
+    <label><b>章節</b><select id="chap"></select></label>
+    <label><b>字型</b><select id="ff">
+      <option value="'Noto Serif TC','Songti TC',serif">襯線（明體）</option>
+      <option value="'Noto Sans TC','PingFang TC',sans-serif">無襯線（黑體）</option>
+      <option value="ui-monospace,Menlo,Consolas,monospace">等寬</option></select></label>
+    <label><b>字級 <span id="fsv"></span></b><input type="range" id="fs" min="12" max="28" value="17"></label>
+    <label><b>行距 <span id="lhv"></span></b><input type="range" id="lh" min="12" max="24" value="17"></label>
+    <label><b>邊距 <span id="mgv"></span></b><input type="range" id="mg" min="8" max="40" value="20"></label>
+    <label><b>配色</b><select id="th">
+      <option value="">紙張</option><option value="hc">高對比白底</option><option value="dk">反相深色</option></select></label>
+    <small>操作：點擊頁面右側／左側翻頁、左右方向鍵、空白鍵、或左右滑動。預覽比例為示意，不代表實機螢幕規格。</small>
+  </section>
+  <section class="stage">
+    <div class="dev"><div class="page" id="page">
+      <div class="view" id="view"><div class="flow" id="flow"></div></div>
+      <div class="foot"><span id="ttl"></span><span id="pg"></span></div>
+      <div class="prog" id="prog"></div>
+    </div></div>
+    <div class="nav"><button id="prev">◀ 上一頁</button><button id="next">下一頁 ▶</button></div>
+  </section>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let book={title:'',chapters:[]},ci=0,pi=0,pages=1,step=0;
+const DEMO={title:'示範：閱讀電子墨水',chapters:[
+{t:'第一章 慢下來',p:['電子墨水螢幕不會發光，只靠環境光反射，讀起來像紙。它的特點是靜止時幾乎不耗電，只有翻頁的瞬間需要更新畫面。','因此，好的閱讀介面會少用動畫、少用顏色，把注意力還給文字本身。字級、行距與邊距，往往比任何花俏功能更影響閱讀的舒適度。','試著拖動左側的滑桿，感受不同設定下，同一段文字如何重新分頁。'.repeat(1)]},
+{t:'第二章 分頁的原理',p:['這個預覽使用 CSS 多欄排版來分頁：把全文排成一排很窄的欄，每一欄就是一頁，翻頁時只是水平移動可視範圍。','好處是文字重排由瀏覽器處理，改變字級或邊距後，頁數會自動重新計算，而且會盡量停留在原本閱讀的位置。','你也可以開啟自己的 EPUB 或純文字檔，檔案不會上傳到任何伺服器。'.repeat(1),'重複一些段落以便測試分頁。'.repeat(1)]}
+]};
+DEMO.chapters.forEach(c=>{for(let i=0;i<6;i++)c.p.push(c.p[i%3]+' 閱讀不必趕時間，翻到下一頁，再繼續也不遲。')});
+function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function load(k,d){try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}}
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function render(keepRatio){
+  const ch=book.chapters[ci];if(!ch)return;
+  const ratio=keepRatio?pi/Math.max(pages-1,1):0;
+  const fs=+$('fs').value,lh=+$('lh').value/10,mg=+$('mg').value,pg=$('page');
+  $('fsv').textContent=fs+'px';$('lhv').textContent=lh.toFixed(1);$('mgv').textContent=mg+'px';
+  pg.className='page '+$('th').value;
+  const v=$('view');v.style.inset=`${mg}px ${mg}px ${mg+22}px ${mg}px`;
+  const f=$('flow');
+  f.style.cssText=`font-family:${$('ff').value};font-size:${fs}px;line-height:${lh}`;
+  f.innerHTML='<h2>'+esc(ch.t)+'</h2>'+ch.p.map(x=>'<p>'+esc(x)+'</p>').join('');
+  const w=v.clientWidth,gap=mg*2;
+  f.style.columnWidth=w+'px';f.style.columnGap=gap+'px';f.style.width=w+'px';
+  step=w+gap;
+  requestAnimationFrame(()=>{
+    pages=Math.max(1,Math.round((f.scrollWidth+gap)/step));
+    pi=Math.min(pages-1,Math.round(ratio*(pages-1)));
+    go(0);
+  });
+  $('ttl').textContent=book.title.slice(0,18);
+}
+function go(d){
+  pi=Math.max(0,Math.min(pages-1,pi+d));
+  $('view').scrollLeft=pi*step;
+  $('pg').textContent=`${ci+1}/${book.chapters.length} 章 · ${pi+1}/${pages} 頁`;
+  $('prog').style.width=((pi+1)/pages*100)+'%';
+  store('er_pos',JSON.stringify({ci,pi}));
+}
+function turn(d){
+  if(d>0&&pi>=pages-1){if(ci<book.chapters.length-1){ci++;$('chap').value=ci;pi=0;render(false)}return}
+  if(d<0&&pi<=0){if(ci>0){ci--;$('chap').value=ci;render(false);setTimeout(()=>{pi=pages-1;go(0)},60)}return}
+  go(d);
+}
+function setBook(b,start){
+  book=b;ci=start?start.ci:0;
+  $('chap').innerHTML=b.chapters.map((c,i)=>`<option value="${i}">${esc(c.t.slice(0,30))}</option>`).join('');
+  $('chap').value=ci;render(false);
+  if(start){setTimeout(()=>{pi=Math.min(pages-1,start.pi);go(0)},80)}
+}
+async function readEpub(buf){
+  const z=await JSZip.loadAsync(buf),dp=new DOMParser();
+  const txt=async p=>z.file(p)?await z.file(p).async('string'):'';
+  const cont=dp.parseFromString(await txt('META-INF/container.xml'),'text/xml');
+  const opfPath=cont.querySelector('rootfile').getAttribute('full-path');
+  const opf=dp.parseFromString(await txt(opfPath),'text/xml');
+  const base=opfPath.includes('/')?opfPath.replace(/[^/]+$/,''):'';
+  const man={};opf.querySelectorAll('manifest > item').forEach(i=>man[i.getAttribute('id')]=i.getAttribute('href'));
+  const title=(opf.querySelector('metadata title')||{}).textContent||'EPUB';
+  const chapters=[];
+  for(const it of opf.querySelectorAll('spine > itemref')){
+    const href=man[it.getAttribute('idref')];if(!href)continue;
+    const html=dp.parseFromString(await txt(base+decodeURIComponent(href)),'text/html');
+    const hd=html.querySelector('h1,h2,h3');
+    const ps=[...html.body.querySelectorAll('p,li,blockquote')].map(e=>e.textContent.trim()).filter(Boolean);
+    if(ps.length)chapters.push({t:hd?hd.textContent.trim():'第 '+(chapters.length+1)+' 節',p:ps});
+  }
+  if(!chapters.length)throw new Error('empty');
+  return{title,chapters};
+}
+$('file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    if(/\.epub$/i.test(f.name)){
+      if(!window.JSZip)throw new Error('JSZip');
+      setBook(await readEpub(await f.arrayBuffer()));
+    }else{
+      const t=await f.text(),ps=t.split(/\n+/).map(s=>s.trim()).filter(Boolean),ch=[];
+      for(let i=0;i<ps.length;i+=40)ch.push({t:'第 '+(ch.length+1)+' 段',p:ps.slice(i,i+40)});
+      setBook({title:f.name,chapters:ch});
+    }
+  }catch(err){alert('無法讀取此檔案（可能是 DRM 保護或格式不支援）。')}
+};
+$('demo').onclick=()=>setBook(DEMO);
+$('chap').onchange=()=>{ci=+$('chap').value;pi=0;render(false)};
+['fs','lh','mg','ff','th'].forEach(id=>{
+  const el=$(id),v=load('er_'+id,null);if(v!==null)el.value=v;
+  el.oninput=()=>{store('er_'+id,el.value);render(true)};
+});
+$('prev').onclick=()=>turn(-1);$('next').onclick=()=>turn(1);
+$('view').addEventListener('click',e=>{const r=$('view').getBoundingClientRect();turn(e.clientX-r.left<r.width/3?-1:1)});
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.key==='ArrowRight'||e.key===' ')turn(1);if(e.key==='ArrowLeft')turn(-1)});
+let sx=null;
+$('view').addEventListener('touchstart',e=>{sx=e.touches[0].clientX},{passive:true});
+$('view').addEventListener('touchend',e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx;sx=null;if(Math.abs(dx)>40){e.preventDefault();turn(dx<0?1:-1)}});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>render(true),150)});
+let pos=null;try{pos=JSON.parse(load('er_pos','null'))}catch(e){}
+setBook(DEMO,pos&&pos.ci<DEMO.chapters.length?pos:null);
+</script>
+</body>
+</html>
